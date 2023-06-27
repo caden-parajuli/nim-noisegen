@@ -1,0 +1,65 @@
+# -*- mode: gitignore; -*-
+
+*.png
+*.gif
+*.jpg
+*.bmp
+*.svg
+
+### Emacs ###
+
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# flymake-mode
+*_flymake.*
+
+# Flycheck
+flycheck_*.el
+
+# projectiles files
+.projectile
+
+
+### Nim ###
+
+*
+!/**/
+!*.*
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+*.elf
+
+nimcache/
+nimblecache/
+htmldocs/
