@@ -1,12 +1,8 @@
 import vmath
-import std/[random]
 import base
+import math
 
-##[
-   Hash lookup table as defined by Ken Perlin. This is a randomly arranged array of all numbers from 0-255 inclusive,
-   repeated once to avoid overflow
- ]##
-
+## Hash lookup table as defined by Ken Perlin
 const p: array[512, int] = [151,160,137,91,90,15,
     131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
     190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
@@ -19,7 +15,7 @@ const p: array[512, int] = [151,160,137,91,90,15,
     129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
     251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
     49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,      # Repeats after this line
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,      # Repeats
     151,160,137,91,90,15,
     131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
     190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
@@ -34,97 +30,73 @@ const p: array[512, int] = [151,160,137,91,90,15,
     49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
     138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180]
 
-type
-  Perlin = ref object of Noise
-    repeat: int
-  Perlin2D* = ref object of Perlin
-  Perlin3D* = ref object of Perlin
+proc grad(hash: int, x, y, z: float64): float64 =
+  let
+    h: int = hash and 15
+    u = if h < 8: x else: y
+    v = if h < 4: y else: (if ((h == 12) or (h == 14)): x else: z)
     
+  result = (if (h and 1) == 0: u else: -u) + (if (h and 2) == 0: v else: -v)
+
 proc fade(t: float64): float64 =
   ## 6t^5 - 15t^4 + 10t^3
-  result = t * t * t * (t * (t * 6 - 15) + 10)
+  return t * t * t * (t * (t * 6 - 15) + 10)
 
-proc inc(noise: Perlin, num: int): int =
-  result = num + 1
-  if noise.repeat != 0:
-    result = result mod noise.repeat
+proc lerp(t, a, b: float64): float64 =
+  return a + t * (b - a);
 
-proc newPerlin*(seed: int64 = 0, repeat: int = 0): Perlin =
-  result = Perlin(repeat: repeat)
-  result.initNoise(seed)
-
-proc newPerlin2D*(seed: int64 = 0, repeat: int = 0): Perlin2D =
-  result = Perlin2D()
-  result.initNoise(seed)
-  result.repeat = repeat
-
-proc newPerlin3D*(seed: int64 = 0, repeat: int = 0): Perlin3D =
-  result = Perlin3D()
-  result.initNoise(seed)
-  result.repeat = repeat
-
-proc grad(hash: int, x, y, z: float64): float64 =
-  case (hash and 0xF):
-    of 0x0: return  x + y
-    of 0x1: return -x + y
-    of 0x2: return  x - y
-    of 0x3: return -x - y
-    of 0x4: return  x + z
-    of 0x5: return -x + z
-    of 0x6: return  x - z
-    of 0x7: return -x - z
-    of 0x8: return  y + z
-    of 0x9: return -y + z
-    of 0xA: return  y - z
-    of 0xB: return -y - z
-    of 0xC: return  y + x
-    of 0xD: return -y + z
-    of 0xE: return  y - x
-    of 0xF: return -y - z
-    else:
-      assert(false)
-      return 0 # never happens
-  
-proc noise*(noise: Perlin3D, pos: DVec3): float64 =
+proc perlinNoise*(x, y, z: float64): float64 =
+  ## Generates Perlin noise for point (x, y, z). To use for 2D noise, simply treat the z coordinate as a seed
   let
-    xi = int(pos.x)
-    yi = int(pos.y)
-    zi = int(pos.z)
+    xi = floor(x).int and 255
+    yi = floor(y).int and 255
+    zi = floor(z).int and 255
   var
-    pos = pos
-    fracPos: DVec3 = fract(pos)
-    u,v,w: float64
-    aaa, aba, aab, abb, baa, bba, bab, bbb: int
-  if noise.repeat != 0:
-    pos.x = zmod(pos.x, noise.repeat.float64)
-    pos.y = zmod(pos.y, noise.repeat.float64)
-    pos.z = zmod(pos.z, noise.repeat.float64)
+    x = x - x.floor()
+    y = y - y.floor()
+    z = z - z.floor()
+  let
+    u: float64 = fade(x)
+    v: float64 = fade(y)
+    w: float64 = fade(z)
+    a = p[xi] + yi
+    aa = p[a] + zi
+    ab = p[a + 1] + zi
+    b = p[xi + 1] + yi
+    ba = p[b] + zi
+    bb = p[b + 1] + zi
 
-  u = fade(fracPos.x)
-  v = fade(fracpos.y)
-  w = fade(fracPos.z)
+  return lerp(w,
+              lerp(v,
+                   lerp(u,
+                        grad(p[aa  ], x  , y  , z   ),
+                        grad(p[ba    ], x-1, y  , z   )),
+                   lerp(u,
+                        grad(p[ab    ], x  , y-1, z   ),
+                        grad(p[bb    ], x-1, y-1, z   ))),
+              lerp(v,
+                   lerp(u,
+                        grad(p[aa + 1], x  , y  , z-1 ),
+                        grad(p[ba + 1], x-1, y  , z-1 )),
+                   lerp(u,
+                        grad(p[ab + 1], x  , y-1, z-1 ),
+                        grad(p[bb + 1], x-1, y-1, z-1 ))))
 
-  aaa = p[p[p[xi] + yi] + zi]
-  aba = p[p[p[xi] + noise.inc(yi)] + zi]
-  aab = p[p[p[xi] + yi] + noise.inc(zi)]
-  abb = p[p[p[xi] + noise.inc(yi)] + noise.inc(zi)]
-  baa = p[p[p[noise.inc(xi)] + yi] + zi ]
-  bba = p[p[p[noise.inc(xi) + noise.inc(yi)] + zi]]
-  bab = p[p[p[noise.inc(xi)] + yi] + noise.inc(zi)]
-  bbb = p[p[p[noise.inc(xi)] + noise.inc(yi)] + noise.inc(zi)]
-
+proc perlinNoise*(pos: DVec3): float64 {.inline.} =
+  return perlinNoise(pos.x, pos.y, pos.z)
+  
+proc perlinOctaves*(x, y, z: float64, octaves: int, persistence: float64): float64 =
   var
-    x1 = lerp(grad(aaa, fracPos.x, fracPos.y, fracPos.z),
-              grad(baa, fracPos.x - 1, fracPos.y, fracPos.z), u)
-    x2 = lerp(grad(aba, fracPos.x, fracPos.y - 1, fracPos.z),
-              grad(bba, fracPos.x - 1, fracPos.y - 1, fracPos.z), u)
-    y1 = lerp(x1, x2, v)
-    y2: float64
-    
-  x1 = lerp(grad(aab, fracPos.x, fracPos.y, fracPos.z - 1),
-            grad(bab, fracPos.x - 1, fracPos.y, fracPos.z - 1), u)
-  x2 = lerp(grad(abb, fracPos.x, fracPos.y - 1, fracPos.z - 1),
-            grad(bbb, fracPos.x - 1, fracPos.y - 1, fracPos.z - 1), u)
-  y2 = lerp(x1, x2, v)
+    total: float64 = 0
+    frequency: float64 = 1
+    amplitude: float64 = 1
+    maxValue: float64 = 0  # Used for normalizing result to 0.0 - 1.0
+  for i in 0 ..< octaves:
+    total += perlinNoise(x * frequency, y * frequency, z * frequency) * amplitude;
+    maxValue += amplitude;
+    amplitude *= persistence;
+    frequency *= 2;  
+  return total / maxValue;
 
-  result = (lerp(y1, y2, w) + 1) / 2
+proc perlinOctaves*(pos: DVec3, octaves: int, persistence: float64 = 0.5): float64 {.inline.} =
+  return perlinOctaves(pos.x, pos.y, pos.z, octaves, persistence)

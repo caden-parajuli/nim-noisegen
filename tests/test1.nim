@@ -6,9 +6,11 @@
 # To run these tests, simply execute `nimble test`.
 
 import unittest
-import noisegen
+import noisegen/[perlin, base]
+
 
 test "Perlin":
-  var myPerlin: Perlin3D = newPerlin3D(seed: 0, repeat: 0)
+  var
+    perlin = newPerlin(repeat = 0)    
+  echo perlin.noise(dvec3(12.0, 14.0, 129.41768))
   
-  check add(5, 5) == 10

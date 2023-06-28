@@ -2,6 +2,8 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import noisegen/[base, perlin]
+import vmath
+import noisegen/[perlin]
 
+export vmath
 export perlin
