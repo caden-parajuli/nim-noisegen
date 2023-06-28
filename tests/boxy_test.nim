@@ -31,7 +31,7 @@ window.onFrame = proc() =
   z = 4.0'f64 * ((frame mod 30).float64 / 30.0'f64)
   for y in 0 ..< image.height:
     for x in 0 ..< image.width:
-      pearl = (0xff and floor(256 * (perlinOctaves(x.float64 / (1080.0'f64 / 32.0'f64), y.float64 / (1080.0'f64 / 32.0'f64), z, octaves = 1, persistence = 0.5'f64)) / 2 + 0.5).uint8)
+      pearl = (0xff and floor(256 * (perlinGradientOctaves(x.float64 / (1080.0'f64 / 32.0'f64), y.float64 / (1080.0'f64 / 32.0'f64), z, octaves = 1, persistence = 0.5'f64))[0] / 2 + 0.5).uint8)
       image[x, y] = rgba(pearl, pearl, pearl, 255)
 
   bxy.addImage("Perlin" & id, image)

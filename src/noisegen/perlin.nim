@@ -31,18 +31,47 @@ const p: array[512, int] = [151,160,137,91,90,15,
     138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180]
 
 proc grad(hash: int, x, y, z: float64): float64 =
+  ## Returns dot product of the computed gradient vector with given x,y,z
   let
     h: int = hash and 15
     u = if h < 8: x else: y
-    v = if h < 4: y else: (if ((h == 12) or (h == 14)): x else: z)
-    
+    v = if h < 4: y else: (if ((h == 12) or (h == 14)): x else: z)    
   result = (if (h and 1) == 0: u else: -u) + (if (h and 2) == 0: v else: -v)
 
-proc fade(t: float64): float64 =
+proc grads(hash: int, x, y, z: float64): (float64, IVec3) =
+  ## Returns dot product of the computed gradient vector with given x,y,z, and the gradient itself
+  case hash and 15:
+        of 0: return  (x + y, ivec3(1, 1, 0))
+        of 1: return (-x + y, ivec3(-1, 1, 0))
+        of 2: return  (x - y, ivec3(1, -1, 0))
+        of 3: return (-x - y, ivec3(-1, -1, 0))
+        of 4: return  (x + z, ivec3(1, 0, 1))
+        of 5: return (-x + z, ivec3(-1, 0, 1))
+        of 6: return  (x - z, ivec3(1, 0, -1))
+        of 7: return (-x - z, ivec3(-1, 0, -1))
+        of 8: return  (y + z, ivec3(0, 1, 1))
+        of 9: return (-y + z, ivec3(0, -1, 1))
+        of 10: return  (y - z, ivec3(0, 1, -1))
+        of 11: return (-y - z, ivec3(0, -1, -1))
+        of 12: return  (x + y, ivec3(1, 1, 0))
+        of 13: return (-y + z, ivec3(0, -1, 1))
+        of 14: return (-x + y, ivec3(-1, 1, 0))
+        of 15: return (-y - z, ivec3(0, -1, -1))
+        else:
+          # Should never happen
+          assert(false)
+          return (0.0, ivec3(0, 0, 0))
+  
+proc fade(t: float64): float64 {.inline.} =
   ## 6t^5 - 15t^4 + 10t^3
   return t * t * t * (t * (t * 6 - 15) + 10)
 
-proc lerp(t, a, b: float64): float64 =
+proc fade_dt(t: float64): float64 {.inline.} =
+  ## $\frac{\partial \text{fade}}{\partial t} = 30(t^4 - 2t^3 + t^2)$
+  return 30 * t * t * (t - 1) * (t - 1)
+  
+proc lerp(a, b, t: float64): float64 {.inline.} =
+  ## Can replace with a call to `mix`
   return a + t * (b - a);
 
 proc perlinNoise*(x, y, z: float64): float64 =
@@ -56,35 +85,34 @@ proc perlinNoise*(x, y, z: float64): float64 =
     y = y - y.floor()
     z = z - z.floor()
   let
-    u: float64 = fade(x)
-    v: float64 = fade(y)
-    w: float64 = fade(z)
+    u = fade(x)
+    v = fade(y)
+    w = fade(z)
     a = p[xi] + yi
     aa = p[a] + zi
     ab = p[a + 1] + zi
     b = p[xi + 1] + yi
     ba = p[b] + zi
     bb = p[b + 1] + zi
-
-  return lerp(w,
-              lerp(v,
-                   lerp(u,
-                        grad(p[aa  ], x  , y  , z   ),
-                        grad(p[ba    ], x-1, y  , z   )),
-                   lerp(u,
-                        grad(p[ab    ], x  , y-1, z   ),
-                        grad(p[bb    ], x-1, y-1, z   ))),
-              lerp(v,
-                   lerp(u,
-                        grad(p[aa + 1], x  , y  , z-1 ),
-                        grad(p[ba + 1], x-1, y  , z-1 )),
-                   lerp(u,
-                        grad(p[ab + 1], x  , y-1, z-1 ),
-                        grad(p[bb + 1], x-1, y-1, z-1 ))))
+  result = lerp(lerp(lerp(grad(p[aa],     x,    y,    z  ),
+                          grad(p[ba],     x-1,  y,    z  ),
+                          u),
+                     lerp(grad(p[ab],     x,    y-1,  z  ),
+                          grad(p[bb],     x-1,  y-1,  z  ),
+                          u),
+                     v),
+                lerp(lerp(grad(p[aa + 1], x,    y,    z-1),
+                          grad(p[ba + 1], x-1,  y,    z-1),
+                          u),
+                     lerp(grad(p[ab + 1], x,    y-1,  z-1),
+                          grad(p[bb + 1], x-1,  y-1,  z-1),
+                          u),
+                     v),
+                w)
 
 proc perlinNoise*(pos: DVec3): float64 {.inline.} =
   return perlinNoise(pos.x, pos.y, pos.z)
-  
+
 proc perlinOctaves*(x, y, z: float64, octaves: int, persistence: float64): float64 =
   var
     total: float64 = 0
@@ -100,3 +128,101 @@ proc perlinOctaves*(x, y, z: float64, octaves: int, persistence: float64): float
 
 proc perlinOctaves*(pos: DVec3, octaves: int, persistence: float64 = 0.5): float64 {.inline.} =
   return perlinOctaves(pos.x, pos.y, pos.z, octaves, persistence)
+  
+proc perlinGradient*(x, y, z: float64): (float64, DVec3) =
+  ##[
+  Generates Perlin noise for point (x, y, z), and computes the analytic gradient (partial derivatives). To compute normals, use ±(grad.x, grad.y, -1)
+  ]##
+  let
+    xi = floor(x).int and 255
+    yi = floor(y).int and 255
+    zi = floor(z).int and 255
+  var
+    x = x - x.floor()
+    y = y - y.floor()
+    z = z - z.floor()
+  let
+    u = fade(x)
+    v = fade(y)
+    w = fade(z)
+    u_dx = fade_dt(x)
+    v_dy = fade_dt(y)
+    w_dz = fade_dt(y)
+    a = p[xi] + yi
+    aa = p[a] + zi
+    ab = p[a + 1] + zi
+    b = p[xi + 1] + yi
+    ba = p[b] + zi
+    bb = p[b + 1] + zi
+    (dot000, g000) = grads(p[aa],     x,   y,   z  )
+    (dot100, g100) = grads(p[ba],     x-1, y,   z  )
+    (dot010, g010) = grads(p[ab],     x,   y-1, z  )
+    (dot110, g110) = grads(p[bb],     x-1, y-1, z  )
+    (dot001, g001) = grads(p[aa + 1], x  , y  , z-1)
+    (dot101, g101) = grads(p[ba + 1], x-1, y  , z-1)
+    (dot011, g011) = grads(p[ab + 1], x  , y-1, z-1)
+    (dot111, g111) = grads(p[bb + 1], x-1, y-1, z-1)
+  # Compute noise value
+  result[0] = lerp(lerp(lerp(dot000, dot100, u),
+                   lerp(dot010, dot110, u),
+                   v),
+              lerp(lerp(dot001, dot101, u),
+                   lerp(dot011, dot111, u),
+                   v),
+              w)
+  # Compute partial derivatives
+  result[1].x = g000.x.float + u_dx * (dot100 - dot000) +
+    u * (g100.x - g000.x).float +
+    v * (g010.x - g000.x).float +
+    w * (g001.x - g000.x).float +
+    u_dx * v * (dot110 - dot010 - dot100 + dot000) +
+    u * v * (g110.x - g010.x - g100.x + g000.x).float +
+    u_dx * w * (dot101 - dot001 - dot100 + dot000) +
+    u * w * (g101.x - g001.x - g100.x - g000.x).float +
+    v * w * (g011.x - g001.x - g010.x + g000.x).float +
+    u_dx * v * w * (dot111 - dot011 - dot101 + dot001 - dot110 + dot010 + dot100 - dot000) +
+    u * v * w * (g111.x - g011.x - g101.x + g001.x - g110.x + g010.x + g100.x - g000.x).float
+  result[1].y = g000.y.float + u * (g100.y - g000.y).float + 
+    v_dy * (dot010 - dot000) +
+    v * (g010.y - g000.y).float +
+    w * (g001.y - g000.y).float +
+    u * v_dy * (dot110 - dot010 - dot100 + dot000) +
+    u * v * (g110.y - g010.y - g100.y + g000.y).float +
+    u * w * (g101.y - g001.y - g100.y + g000.y).float +
+    v_dy * w * (dot011 - dot001 - dot010 + dot000) +
+    v * w * (g011.y - g001.y - g010.y + g000.y).float +
+    u * v_dy * w * (dot111 - dot011 - dot101 + dot001 - dot110 + dot010 + dot100 - dot000) +
+    u * v * w * (g111.y - g011.y - g101.y + g001.y - g110.y + g010.y + g100.y - g000.y).float
+  result[1].z = g000.z.float +
+    u * (g100.z - g000.z).float +
+    v * (g010.z - g000.z).float +
+    w_dz * (dot001 - dot000) +
+    w * (g001.z - g000.z).float +
+    u * v * (g110.z - g010.z - g100.z + g000.z).float +
+    u * w_dz * (dot101 - dot001 - dot100 + dot000) +
+    u * w * (g101.z - g001.z - g100.z + g000.z).float +
+    v * w_dz * (dot011 - dot001 - dot010 + dot000) +
+    v * w * (g011.z - g001.z - g010.z + g000.z).float +
+    u * v * w_dz * (dot111 - dot011 - dot101 + dot001 - dot110 + dot010 + dot100 - dot000) +
+    u * v * w * (g111.z - g011.z - g101.z + g001.z - g110.z + g010.z + g100.z - g000.z).float
+
+    
+proc perlinGradientOctaves*(x, y, z: float64, octaves: int, persistence: float64): (float64, DVec3) =
+  var
+    total: float64 = 0
+    frequency: float64 = 1
+    amplitude: float64 = 1
+    maxValue: float64 = 0  # Used for normalizing result to -1.0 - 1.0
+    noise: (float64, DVec3)
+    totalNorm: DVec3
+  for i in 0 ..< octaves:
+    noise = perlinGradient(x * frequency, y * frequency, z * frequency)
+    total += noise[0] * amplitude
+    totalNorm += noise[1] * amplitude
+    maxValue += amplitude
+    amplitude *= persistence
+    frequency *= 2
+  return (total / maxValue, totalNorm / maxValue)
+
+proc perlinGradientOctaves*(pos: DVec3, octaves: int, persistence: float64 = 0.5): (float64, DVec3) {.inline.} =
+  return perlinGradientOctaves(pos.x, pos.y, pos.z, octaves, persistence)
