@@ -2,7 +2,7 @@
 
 ## About
 
-Supported noise functions are in the following table. The `GPU` column marks whether the noise function can be used in a GPU shader (e.g. via [shady](https://github.com/treeform/shady)). Analytic gradients are significantly faster and more accurate to the actual geometry than regular gradients computed by a central difference quotient. Analytic gradients can be used to easily compute surface normals since $n = \left( \frac{\partial f}{\partial x}(v), \frac{\partial f}{\partial y}(v), -1 \right)$
+Supported noise functions are in the following table. The `GPU` column marks whether the noise function can be used in a GPU shader (e.g. via [shady](https://github.com/treeform/shady)). Analytic gradients are significantly faster and more accurate to the actual geometry than regular gradients computed by a central difference quotient. Analytic gradients can be used to easily compute surface normals since $\mathbf{n} = \pm\left( \frac{\partial f}{\partial x}(\mathbf{v}), \frac{\partial f}{\partial y}(\mathbf{v}), -1 \right)$ is a normal vector to the surface given by $z = f(x, y)$.
 
 | Noise        |  CPU |  GPU | Gradient | Analytic Gradient |
 |--------------|------|------|----------|-------------------|
@@ -14,4 +14,4 @@ Supported noise functions are in the following table. The `GPU` column marks whe
 
 ## Implementation Details
 
-The Perlin noise function is essentially a translation of Ken Perlin's ["Improved Noise reference implementation"](https://mrl.cs.nyu.edu/~perlin/noise) from Java to Nim.
+The Perlin noise function is a translation of Ken Perlin's ["Improved Noise reference implementation"](https://mrl.cs.nyu.edu/~perlin/noise) from Java to Nim. 
