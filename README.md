@@ -6,7 +6,7 @@ Supported noise functions are in the following table. The `GPU` column marks whe
 
 | Noise        |  CPU |  GPU | Gradient | Analytic Gradient |
 |--------------|------|------|----------|-------------------|
-| Perlin       | ✅︎   | ❌   | ❌       |  ❌              |
+| Perlin       | ✅︎   | ❌   | ✅       |  ✅              |
 | Value        | ❌   | ❌   | ❌       |  ❌              |
 | Voronoise    | ❌   | ❌   | ❌       |  ❌              |
 | OpenSimplex  | ❌   | ❌   | ❌       |  ❌              |
@@ -14,4 +14,4 @@ Supported noise functions are in the following table. The `GPU` column marks whe
 
 ## Implementation Details
 
-The Perlin noise function is a translation of Ken Perlin's ["Improved Noise reference implementation"](https://mrl.cs.nyu.edu/~perlin/noise) from Java to Nim. 
+The Perlin noise function is based on Ken Perlin's ["Improved Noise reference implementation"](https://mrl.cs.nyu.edu/~perlin/noise) in Java. 

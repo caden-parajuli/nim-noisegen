@@ -131,7 +131,8 @@ proc perlinOctaves*(pos: DVec3, octaves: int, persistence: float64 = 0.5): float
   
 proc perlinGradient*(x, y, z: float64): (float64, DVec3) =
   ##[
-  Generates Perlin noise for point (x, y, z), and computes the analytic gradient (partial derivatives). To compute normals, use ±(grad.x, grad.y, -1)
+  Generates Perlin noise for point (x, y, z), and computes the analytic gradient (partial derivatives).
+  To compute normals, use ±(grad.x, grad.y, -1)
   ]##
   let
     xi = floor(x).int and 255
@@ -163,14 +164,24 @@ proc perlinGradient*(x, y, z: float64): (float64, DVec3) =
     (dot011, g011) = grads(p[ab + 1], x  , y-1, z-1)
     (dot111, g111) = grads(p[bb + 1], x-1, y-1, z-1)
   # Compute noise value
-  result[0] = lerp(lerp(lerp(dot000, dot100, u),
-                   lerp(dot010, dot110, u),
-                   v),
-              lerp(lerp(dot001, dot101, u),
-                   lerp(dot011, dot111, u),
-                   v),
-              w)
-  # Compute partial derivatives
+  result[0] = dot000 +
+    u * (dot100 - dot000) +
+    v * (dot010 - dot000) +
+    w * (dot001 - dot000) +
+    u * v * (dot110 - dot010 - dot100 + dot000) +
+    u * w * (dot101 - dot001 - dot100 + dot000) +
+    v * w * (dot011 - dot001 - dot010 + dot000) +
+    u * v * w * (dot111 - dot011 - dot101 + dot001 - dot110 + dot010 + dot100 - dot000)
+  # Ken Perlin's method, algebraically equivalent
+  # result[0] = lerp(lerp(lerp(dot000, dot100, u),
+  #                       lerp(dot010, dot110, u),
+  #                       v),
+  #                  lerp(lerp(dot001, dot101, u),
+  #                       lerp(dot011, dot111, u),
+  #                       v),
+  #                  w)
+  
+  # Compute partial derivatives. Method from: https://stackoverflow.com/questions/4297024/3d-perlin-noise-analytical-derivative
   result[1].x = g000.x.float + u_dx * (dot100 - dot000) +
     u * (g100.x - g000.x).float +
     v * (g010.x - g000.x).float +
